@@ -1,8 +1,50 @@
-var http = require('http');
- 
-var server = http.createServer(function (req, res) {
-  res.writeHead(200, { "Content-Type": "text/plain" })
-  res.end("Hello world\n");
+var express = require('express');
+var ArticleProvider = require('./articleprovider-memory').ArticleProvider;
+
+var app = module.exports = express.createServer();
+
+app.configure(function(){
+  app.set('views', __dirname + '/views');
+  app.set('view engine', 'jade');
+  app.use(express.bodyParser());
+  app.use(express.methodOverride());
+  app.use(require('stylus').middleware({ src: __dirname + '/public' }));
+  app.use(app.router);
+  app.use(express.static(__dirname + '/public'));
 });
- 
-server.listen(process.env.PORT || 8001);
+
+app.configure('development', function(){
+  app.use(express.errorHandler({ dumpExceptions: true, showStack: true }));
+});
+
+app.configure('production', function(){
+  app.use(express.errorHandler());
+});
+
+var articleProvider= new ArticleProvider();
+
+app.get('/', function(req, res){
+    articleProvider.findAll( function(error,docs){
+        res.render('index.jade', { locals: {
+            title: 'Blog',
+            articles:docs
+            }
+        });
+    })
+});
+app.get('/blog/new', function(req, res) {
+    res.render('blog_new.jade', { locals: {
+        title: 'New Post'
+    }
+    });
+});
+
+app.post('/blog/new', function(req, res){
+    articleProvider.save({
+        title: req.param('title'),
+        body: req.param('body')
+    }, function( error, docs) {
+        res.redirect('/')
+    });
+});
+app.listen(3000);
